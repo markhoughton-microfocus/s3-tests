@@ -12385,6 +12385,44 @@ def test_object_lock_delete_object_with_retention():
 
 
 @attr(resource='bucket')
+@attr(method='delete')
+@attr(operation='Test multi-delete object with retention')
+@attr(assertion='retention period make effects')
+@attr('object-lock')
+def test_object_lock_multi_delete_object_with_retention():
+    bucket_name = get_new_bucket_name()
+    client = get_client()
+    client.create_bucket(Bucket=bucket_name, ObjectLockEnabledForBucket=True)
+    key = 'file1'
+
+    response = client.put_object(Bucket=bucket_name, Body='abc', Key=key)
+    retention = {'Mode':'GOVERNANCE', 'RetainUntilDate':datetime.datetime(2030,1,1,tzinfo=pytz.UTC)}
+    client.put_object_retention(Bucket=bucket_name, Key=key, Retention=retention)
+
+    delete_response = client.delete_objects(
+        Bucket=bucket_name,
+        Delete={
+            'Objects': [
+                {
+                    'Key': key,
+                    'VersionId': response['VersionId']
+                }
+            ]
+        }
+    )
+
+
+    assert( ('Deleted' not in delete_response) or (len(delete_response['Deleted']) == 0) )
+    eq(len(delete_response['Errors']), 1)
+    
+    eq(delete_response['Errors'][0]['Code'], 'AccessDenied')
+
+    response = client.delete_object(Bucket=bucket_name, Key=key, VersionId=response['VersionId'], BypassGovernanceRetention=True)
+    eq(response['ResponseMetadata']['HTTPStatusCode'], 204)
+
+
+
+@attr(resource='bucket')
 @attr(method='put')
 @attr(operation='Test put legal hold')
 @attr(assertion='success')
