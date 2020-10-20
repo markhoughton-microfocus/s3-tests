@@ -12414,11 +12414,29 @@ def test_object_lock_multi_delete_object_with_retention():
 
     assert( ('Deleted' not in delete_response) or (len(delete_response['Deleted']) == 0) )
     eq(len(delete_response['Errors']), 1)
-    
-    eq(delete_response['Errors'][0]['Code'], 'AccessDenied')
+    failed_object = delete_response['Errors'][0]
+    eq(failed_object['Code'], 'AccessDenied')
+    eq(failed_object['Key'], key)
+    eq(failed_object['VersionId'], response['VersionId'])
 
-    response = client.delete_object(Bucket=bucket_name, Key=key, VersionId=response['VersionId'], BypassGovernanceRetention=True)
-    eq(response['ResponseMetadata']['HTTPStatusCode'], 204)
+    delete_response = client.delete_objects(
+        Bucket=bucket_name,
+        Delete={
+            'Objects': [
+                {
+                    'Key': key,
+                    'VersionId': response['VersionId']
+                }
+            ]
+        },
+        BypassGovernanceRetention=True
+    )
+
+    assert( ('Errors' not in delete_response) or (len(delete_response['Errors']) == 0) )
+    eq(len(delete_response['Deleted']), 1)
+    deleted_object = delete_response['Deleted'][0]
+    eq(deleted_object['Key'], key)
+    eq(deleted_object['VersionId'], response['VersionId'])
 
 
 
